@@ -1,6 +1,6 @@
 ---
 title: "Assignment 3"
-author: "Mehvish Jamal"
+author: "Naomi Robalino, Joaquin Tome, Mehvish Jamal"
 date: "9/20/2021"
 output: html_document
 ---
@@ -52,7 +52,10 @@ ggplot(township) +
   theme_map() +
   annotation_scale()
 ```
-# Creating a Buffer: Cape Town Parks and Their 20 Meter Radius
+
+# Creating a Buffer: What is the 100 meter buffer zone around parks in Cape Town? ---
+Using data from public parks located in Cape Town, we created a 100 meter buffer zone around the polygonal park data. Looking at the green space, we can see most parks are within at least 100 meters of each other in Cape Town.  
+
 ```{r}
 park_buffer <- st_buffer(parks, dist = 100) %>%
   st_union()
@@ -65,7 +68,10 @@ ggplot(park_buffer) +
   theme_map()+
   theme(legend.position = "right")
 ```
-# Subsetting Points with a Polygon: How many IRT Bus Stops are located within 20 meters of a Park?
+
+# Subsetting Points with a Polygon: How many bus stops in Cape Town are within 100 meters of a park? ---
+After creating a 100 meter buffer zone around each park in Cape Town, we mapped the number of bus stops within the 100 meter buffer zone. This map is effective in showing the concentration of bus stops the northwest region of Cape Town, but lack of bus stops near the parks in the center of the city. 
+
 ```{r}
 busstop_park <- busstop[park_buffer,]
 ```  
@@ -168,7 +174,7 @@ ggplot(office) +
   theme(legend.position = "left")
 ```
 
-# Identifying Overlapping Polygons: Which townships contain parks? ---
+# Identifying Overlapping Polygons: Which townships contain parks? -----
 This map illustrates which townships contain parks. It effectively shows which townships overlap with parks and which do not. However because there are many parks in Cape Town that do not overlap with a township, the scale of the map has to be fairly zoomed out in order to capture all the parks. This makes it harder to see the overlap status of the townships.
 ```{r}
 township <- township %>%
@@ -206,5 +212,6 @@ ggplot(parks) +
         legend.background = element_rect(fill = alpha("white", 0.5), 
                                          color = "gray"))
 ```
+
 # Teamwork Assessment ---
 We met together to choose and import our datasets, transform the data to the projected coordinate system and discuss workflow. We decided to each make two of the six maps. We supported each other with troubleshooting as we ran into errors, and joined Jonathan's office hours together for challenges that were beyond our skill-level. Finally, we collaborated virtually to combine our code and knit our final HTML file. The work was equally shared between all three of us. We unanimously agreed to distribute 30 points evenly between each group member.
