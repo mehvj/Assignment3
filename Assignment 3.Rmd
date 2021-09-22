@@ -108,6 +108,7 @@ pct_parks_busstop
 ```
 
 # Counting Points in a Polygon: Number of Offices in Townships ---
+Analyzing data from Housing & Maintenance offices located in Cape Town, we created a map to display the number of offices in each township. The map is effective in showing that there is a low quantity of Housing & Maintenance offices in each township.
 ```{r}
 township <-township %>%
   mutate(num_office = lengths(st_covers(township, office)))
@@ -130,6 +131,31 @@ theme_map() +
 ```
 
 # Calculating Areas & Densities: Density of Parks in Townships ---
+Using data from public parks located in Cape Town, we created a map to display the density (number of parks per square km) in each township. This map shows a mid-level density in the majority of the polygons under analysis with a few exceptions in the smallest polygons.
+```{r}
+township <- township %>%
+  mutate(num_parks = lengths(st_overlaps(township, parks))) %>%
+  mutate(area = set_units(st_area(township), km^2)) %>%
+  mutate(parks_dens = as.numeric(num_parks / area))
+
+ggplot(township) +
+  annotation_map_tile(zoomin = 0,progress="none",type="stamenbw")+
+  labs(caption = "Map tiles and data by Open Map") +
+  geom_sf(color = NA, 
+          aes(fill = parks_dens)) +
+    scale_fill_viridis_c (name = 
+                           "Cape Town \nby parks density",
+                       breaks = breaks <- seq(0, 40, by = 5),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      " parks density per square km")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.position = "right",
+    legend.background = element_rect(fill = alpha("white", 0.5), 
+                                            color = "gray"))
+```
 
 
 # Finding the Closest Point: How far is each Cape Town Housing and Maintenance Office from a bus stop? ---
