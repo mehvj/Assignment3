@@ -1,30 +1,134 @@
 ---
-title: "Assignment 3 Mkdwn"
+title: "Assignment 3"
 author: "Mehvish Jamal"
 date: "9/20/2021"
 output: html_document
 ---
+# Introduction ---
+Our group was interested in looking at spatial data from Cape Town, South Africa. We identified point data, including Integrated Rapid Transit bus stops and Cape Town's Housing and Maintenance Offices, and polygon layers, including parks and the boundaries of Less Formal Township Establishment Act (LFTEA) Areas. LFTEA was established in 1991 and allows for less formal residential settlement, speedier land development, and community regulation of land use for communal residential settlements. 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Loading Packages ---
+```{r}
+library(sf)
+library(tidyverse)
+library(ggthemes)
+library(ggspatial)
+library(units)
+library(nngeo)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+# Adding Spatial Datasets ---
+```{r}
+township <- st_read("Township.geojson", quiet = TRUE)
+parks <- st_read("Parks.geojson", quiet = TRUE)
+busstop <- st_read("Offices.geojson", quiet = TRUE)
+office <- st_read("IRT.geojson", quiet = TRUE)
 ```
 
-## Including Plots
+# Transforming the Data with a Projected Coordinate System ---
+```{r}
+CT_city_plane <- "+proj=tmerc +lat_0=0 +lon_0=19 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 
-You can also embed plots, for example:
+township <- township %>%
+  st_transform(CT_city_plane)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+parks <- parks %>%
+  st_transform(CT_city_plane)
+
+busstop <- busstop %>%
+  st_transform(CT_city_plane)
+
+office <- office %>%
+  st_transform(CT_city_plane)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Plotting the Data ---
+```{r}
+ggplot(township) +
+  geom_sf(fill = NA, color = "lightcoral") +
+  geom_sf(data = parks, fill = "darkseagreen", color = NA) +
+  geom_sf(data = busstop, color = "plum2", size = 0.1) +
+  geom_sf(data = office, color = "lightblue2", size = 0.003) +
+  theme_map() +
+  annotation_scale()
+```
+
+# Finding the Closest Point - How far is each Cape Town Housing and Maintenance Office from a bus stop? ---
+```{r}
+office <- office %>%
+  mutate(busstop_dist = st_nn(office, busstop, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(busstop_dist = as.numeric(busstop_dist))
+```
+```{r}
+avg_busstop_dist <- mean(office$busstop_dist)
+avg_busstop_dist
+```
+```{r}
+right_side <- st_bbox(office)$xmax
+left_side  <- st_bbox(office)$xmin
+top_side <- st_bbox(office)$ymax
+bottom_side <- st_bbox(office)$ymin
+
+ggplot(office) +
+  geom_sf(size = 0.003,
+          aes(color = busstop_dist)) +
+  coord_sf(xlim = c(left_side-15000, right_side+1000),
+           ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
+  scale_color_viridis_c(name =
+                          "Cape Town Housing & Maintenance Offices\nby distance to a Bus Stop") +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side -13000,
+           y = top_side - 5000,
+           label = paste("On average, a Cape Town Housing\nand Maintenance Office\nis ",
+           prettyNum(avg_busstop_dist, digits = 3),
+           " meters from a bus stop.",
+           sep = ""),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5),
+                                         color = "gray"))+
+  theme(legend.position = "left")
+```
+
+# Identifying Overlapping Polygons - Which townships contain parks? ---
+```{r}
+township <- township %>%
+  mutate(num_parks = lengths(st_overlaps(township, parks))) %>%
+  mutate(has_parks = num_parks > 0)
+
+n_parks_township <- sum(township$has_parks)
+
+n_parks_township
+```
+```{r}
+left_side  <- st_bbox(parks)$xmin
+top_side <- st_bbox(parks)$ymax
+
+ggplot(parks) +
+  geom_sf(fill = "darkseagreen", color = NA) +
+  geom_sf(data = township,
+          aes(fill = has_parks)) +
+  scale_fill_manual(values = c("cornsilk1", "darkseagreen1"),
+          name = "Cape Town Townships\nby presence of a park", 
+          labels = c("Township without\nan overlapping park",
+                     "Township with an\noverlapping park")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side -13000, 
+           y = top_side - 5000, 
+           label = paste(n_parks_township ,
+                         "of Cape Town's",
+                         "townships contain\nor overlap with", 
+                         "a park."),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "white"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
