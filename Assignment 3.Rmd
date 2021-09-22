@@ -52,8 +52,82 @@ ggplot(township) +
   theme_map() +
   annotation_scale()
 ```
+# Creating a Buffer: Cape Town Parks and Their 20 Meter Radius
+```{r}
+park_buffer <- st_buffer(parks, dist = 100) %>%
+  st_union()
+ggplot(park_buffer) +
+  annotation_map_tile(zoomin = 0, progress = "none", type = "stamenbw")  +
+  geom_sf() +
+  labs(caption = "Map tiles by Stamen Design. Data by OpenStreetMap")+
+  geom_sf(aes(fill = "Park Buffer Zone"), size =1, color = NA) +
+  scale_fill_manual(values = "darkseagreen", name = "") +
+  theme_map()+
+  theme(legend.position = "right")
+```
+# Subsetting Points with a Polygon: How many IRT Bus Stops are located within 20 meters of a Park?
+```{r}
+busstop_park <- busstop[park_buffer,]
+```  
 
-# Finding the Closest Point - How far is each Cape Town Housing and Maintenance Office from a bus stop? ---
+```{r}
+busstop_1 <- busstop %>%
+  st_join(busstop_park) %>%
+  mutate(by_park = !is.na(NAME.y))
+```
+
+```{r}
+n_parks_busstop <- sum(busstop$by_park)
+
+n_parks_busstop
+```
+```{r}
+n_busstop <- length(busstop$by_park)
+
+pct_parks_busstop <- n_parks_busstop / n_busstop
+
+pct_parks_busstop
+```
+```{r}
+  ggplot(park_buffer) +
+    annotation_map_tile(zoomin = 0, progress = "none", type = "stamenbw")  +
+     geom_sf() +
+  labs(caption = "Map tiles by Stamen Design. Data by OpenStreetMap")+
+  geom_sf(aes(fill = "Park Buffer Zone"), size = 3, color =NA) +
+  geom_sf(data = busstop_park, aes(color = "Bus Stop within 100 m of Park"), size = 0.01)+
+  scale_fill_manual(values = "darkseagreen", name = "") +
+  scale_color_manual(values = c("firebrick4"), name = "") +
+  theme_map()+
+  theme(legend.position = "right")
+```
+
+# Counting Points in a Polygon: Number of Offices in Townships ---
+```{r}
+township <-township %>%
+  mutate(num_office = lengths(st_covers(township, office)))
+
+ggplot(township) +
+  annotation_map_tile(zoomin = 0,progress="none",type="stamenbw")+
+  labs(caption = "Map tiles and data by Open Map") +
+  geom_sf(color = NA, 
+          aes(fill = num_office)) +
+  scale_fill_viridis_b(name = "Cape Town Townships\nby number of Housing\n & Maintenance Offices") +
+                       # breaks = seq(0, 6000, by = 500),
+                       # labels = seq(0, 6000, by = 500)) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.position = "right", 
+  legend.background = element_rect(fill = alpha("white", 1), 
+                                         color = "gray"))
+```
+
+# Calculating Areas & Densities: Density of Parks in Townships ---
+
+
+# Finding the Closest Point: How far is each Cape Town Housing and Maintenance Office from a bus stop? ---
+This map illustrates how far each Cape Town Housing and Maintenace Office is from an IRT bus stop (in meters). This map effectively shows clusters where the offices are proximate to bus stops, and those that are further. The map could be made more effective with a base layer that spatially orients the viewer with where in the city these clusters are.
 ```{r}
 office <- office %>%
   mutate(busstop_dist = st_nn(office, busstop, 
@@ -76,7 +150,7 @@ ggplot(office) +
   coord_sf(xlim = c(left_side-15000, right_side+1000),
            ylim = c(bottom_side-1000, top_side+1000), expand = FALSE) +
   scale_color_viridis_c(name =
-                          "Cape Town Housing & Maintenance Offices\nby distance to a Bus Stop") +
+                          "Cape Town Housing & Maintenance Offices\nby distance to a Bus Stop (in meters)") +
   annotation_scale(location = "br") +
   annotation_north_arrow(location = "tr",
                          style = north_arrow_minimal()) +
@@ -94,7 +168,8 @@ ggplot(office) +
   theme(legend.position = "left")
 ```
 
-# Identifying Overlapping Polygons - Which townships contain parks? ---
+# Identifying Overlapping Polygons: Which townships contain parks? ---
+This map illustrates which townships contain parks. It effectively shows which townships overlap with parks and which do not. However because there are many parks in Cape Town that do not overlap with a township, the scale of the map has to be fairly zoomed out in order to capture all the parks. This makes it harder to see the overlap status of the townships.
 ```{r}
 township <- township %>%
   mutate(num_parks = lengths(st_overlaps(township, parks))) %>%
@@ -131,4 +206,5 @@ ggplot(parks) +
         legend.background = element_rect(fill = alpha("white", 0.5), 
                                          color = "gray"))
 ```
-
+# Teamwork Assessment ---
+We met together to choose and import our datasets, transform the data to the projected coordinate system and discuss workflow. We decided to each make two of the six maps. We supported each other with troubleshooting as we ran into errors, and joined Jonathan's office hours together for challenges that were beyond our skill-level. Finally, we collaborated virtually to combine our code and knit our final HTML file. The work was equally shared between all three of us. We unanimously agreed to distribute 30 points evenly between each group member.
