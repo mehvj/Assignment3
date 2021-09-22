@@ -132,6 +132,7 @@ theme_map() +
 
 # Calculating Areas & Densities: Density of Parks in Townships ---
 Using data from public parks located in Cape Town, we created a map to display the density (number of parks per square km) in each township. This map shows a mid-level density in the majority of the polygons under analysis with a few exceptions in the smallest polygons.
+
 ```{r}
 township <- township %>%
   mutate(num_parks = lengths(st_overlaps(township, parks))) %>%
@@ -141,11 +142,11 @@ township <- township %>%
 ggplot(township) +
   annotation_map_tile(zoomin = 0,progress="none",type="stamenbw")+
   labs(caption = "Map tiles and data by Open Map") +
-  geom_sf(color = NA, 
+  geom_sf(color = NA,
           aes(fill = parks_dens)) +
-    scale_fill_viridis_c (name = 
+    scale_fill_viridis_c (name =
                            "Cape Town \nby parks density",
-                       breaks = breaks <- seq(0, 40, by = 5),
+                       breaks = breaks <- seq(5, 90, by = 20),
                        labels = paste(prettyNum(breaks, big.mark = ","),
                                       " parks density per square km")) +
   annotation_scale(location = "br") +
@@ -153,10 +154,9 @@ ggplot(township) +
                          style = north_arrow_minimal()) +
 theme_map() +
   theme(legend.position = "right",
-    legend.background = element_rect(fill = alpha("white", 0.5), 
+    legend.background = element_rect(fill = alpha("white", 0.5),
                                             color = "gray"))
 ```
-
 
 # Finding the Closest Point: How far is each Cape Town Housing and Maintenance Office from a bus stop? ---
 This map illustrates how far each Cape Town Housing and Maintenace Office is from an IRT bus stop (in meters). This map effectively shows clusters where the offices are proximate to bus stops, and those that are further. The map could be made more effective with a base layer that spatially orients the viewer with where in the city these clusters are.
