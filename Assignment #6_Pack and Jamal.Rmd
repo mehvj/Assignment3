@@ -1,0 +1,425 @@
+---
+title: 'Quantitative Analysis | Assignment #6'
+author: "Livesey Pack and Mehvish Jamal"
+date: "11/29/2021"
+output:
+  html_document: default
+  pdf_document: default
+theme: readable
+toc: yes
+toc_depth: 3
+toc_float: yes
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Research Question 
+How does income diversity in core-based statistical areas contribute to those core-based statistical areas' economic prosperity?
+
+# Prior Literature
+According to the Social Science Research Council's (2007) Mixed-Income Research Design Group, mixed-income communities facilitate the co-location of lower-income residents, who historically live in geographies of concentrated poverty in the United States, and higher-income neighbors. The proximity of these populations from diverse backgrounds enables greater social exchange that could contribute to greater opportunity for lower-income residents. They state that mixed-income strategies "[create] a stable, high-quality community that is home to residents of very diverse backgrounds." Levy, McDade and Dumlao (2010) support this conclusion in their assessment of the benefits of mixed-income housing. They summarize the primary benefits of mixed-income housing strategies as: poverty alleviation, desegregation and urban revitalization.
+
+# Population
+The sample population includes all households living in core-based statistical areas 
+(CBSAs) in Texas. The analysis will include the following variables:
+
+* Total households (U.S. Census Bureau, 2010) 
+* Gini Index of Income Inequality (U.S. Census Bureau, 2010)
+* Median home value (U.S. Census Bureau, 2010)
+* Home-ownership rates (U.S. Census Bureau, 2010)
+* Percent of population that is rent burdened (U.S. Census Bureau, 2010)
+* Core-based statistical area type (American Community Survey, 2019)
+
+# Load Data
+```{r}
+#install.packages("survey")
+#install.packages("srvyr")
+#install.packages("tigris")
+#install.packages("gridExtra")
+#install.packages("dplyr")
+#install.packages("huxtable")
+```
+
+We used the following libraries for this assignment:
+```{r, message = FALSE}
+library(tidycensus)
+library(tidyverse)
+library(readxl)
+library(knitr)
+library(sf)
+library(tigris)
+library(gridExtra)
+library(ipumsr)
+library(survey)
+library(srvyr)
+library(dplyr)
+library(ggplot2)
+library(jtools)
+library(weights)
+library(R.devices)
+library(interactions)
+library(huxtable)
+```
+
+Next, we loaded our variables from the 2010 Census and our geographic areas of focus from the 2019 American Community Survey. These data sets are courtesy of the U.S. Census Bureau. The resulting data table, including 71 observations, is highlighted below. 
+
+```{r}
+variables <- c(Tot_HUs = "B25002_001",
+               Occ_HUs = "B25002_002",
+               Own_HUs = "B25003_002",
+               Rent_HUs = "B25003_003",
+               Rent_30to35 = "B25070_007",
+               Rent_35to40 = "B25070_008",
+               Rent_40to50 = "B25070_009",
+               Rent_gt50 = "B25070_010",
+               med_houseval = "B25077_001",
+               Gini = "B19083_001")
+
+data <- get_acs(geography = "cbsa",
+                    variables = variables,
+                    output = "wide") %>%
+  filter(str_detect(NAME, "TX")) %>%
+  mutate(type = ifelse(str_detect(NAME, "Metro"), "Metropolitan", "Micropolitan")) %>%
+  mutate(rent_burdened = Rent_30to35E + Rent_35to40E + Rent_40to50E + Rent_gt50E) %>%
+  mutate(pct_rentburd = rent_burdened / Rent_HUsE) %>%
+  mutate(pct_own = Own_HUsE / Occ_HUsE)
+
+kable(head(data))
+  
+```
+
+# Descriptive Statistics
+
+## Continuous Variables
+Our continuous variables include the Gini Index of Income Inequality, homeownership rates, percent of population that is rent-burdened, and median house value. 
+
+### Calculations
+We're now calculating a series of descriptive statistics for our four continuous variables.First, we calculated the sample mean and the 95-percent confidence interval. 
+```{r}
+### Sample Mean and 95-Percent Confidence Interval 
+gini_t_test <- t.test(data$GiniE)
+pown_t_test <- t.test(data$pct_own)
+prentburd_t_test <- t.test(data$pct_rentburd)
+houseval_t_test <- t.test(data$med_housevalE)
+```
+
+Then we calculated the median and interquartile ranges.
+```{r}
+### Median and Interquartile Ranges
+gini_quartiles <- quantile(data$GiniE, na.rm = TRUE)
+pown_quartiles <- quantile(data$pct_own, na.rm = TRUE)
+prentburd_quartiles <- quantile(data$pct_rentburd, na.rm = TRUE)
+houseval_quartiles <- quantile(data$med_housevalE, na.rm = TRUE)
+```
+
+Finally, we calculated the standard deviation for each data set. 
+```{r}
+### Standard Deviation 
+gini_st_dev <- sd(data$GiniE, na.rm = TRUE)
+pown_st_dev <- sd(data$pct_own, na.rm = TRUE)
+prentburd_st_dev <- sd(data$pct_rentburd, na.rm = TRUE)
+houseval_st_dev <- sd(data$med_housevalE, na.rm = TRUE)
+```
+
+With our descriptive statistics ready, we plotted histograms for each continuous variable in anticipation of displaying our results. 
+```{r}
+### Plotting Histograms 
+gini_hist <- ggplot(data) + 
+  geom_histogram(aes(x = GiniE), 
+                 bins = 10)
+
+pown_hist <- ggplot(data) +
+  geom_histogram(aes(x = pct_own),
+                 bins = 10)
+
+prentburd_hist <- ggplot(data) +
+  geom_histogram(aes(x = pct_rentburd),
+                 bins = 10)
+
+houseval_hist <- ggplot(data) +
+  geom_histogram(aes(x = med_housevalE),
+                 bins = 10)
+```
+
+### Results 
+We have decided to use both a table and a series of histograms to display our results.
+
+A summary of our descriptive statistics for each continuous variable is available below. 
+```{r}
+cont_summary <- tibble(
+  Variable = c("Gini Index of Income Inequality", "Homeownership Rate (percent)", 
+               "Rent Burdened Population (percent, 30% of income on rent or more)", 
+               "Median Home Value (dollars)"),
+  `Sample mean` = c(gini_t_test$estimate, 
+                    pown_t_test$estimate,
+                    prentburd_t_test$estimate,
+                    houseval_t_test$estimate),
+  `Population mean (95% confidence) - low` = 
+    c(gini_t_test$conf.int[1],
+      pown_t_test$conf.int[1],
+      prentburd_t_test$conf.int[1],
+      houseval_t_test$conf.int[1]),
+  `Population mean (95% confidence) - high` =
+    c(gini_t_test$conf.int[2],
+      pown_t_test$conf.int[2],
+      prentburd_t_test$conf.int[2],
+      houseval_t_test$conf.int[2]),
+  Median = c(gini_quartiles[3],
+             pown_quartiles[3],
+             prentburd_quartiles[3],
+             houseval_quartiles[3]),
+  `Interquartile range` = c(gini_quartiles[4] - gini_quartiles[2],
+                            pown_quartiles[4] - pown_quartiles[2],
+                            prentburd_quartiles[4] - prentburd_quartiles[2],
+                            (houseval_quartiles[4] - houseval_quartiles[2])),
+  `Standard deviation` = c(gini_st_dev,
+                           pown_st_dev,
+                           prentburd_st_dev,
+                           houseval_st_dev))
+
+kable(cont_summary, digits = 2)
+```
+
+Then below is our series of histograms. 
+```{r, warning=FALSE, message=FALSE, gif.height=4, fig.width=7}
+pretty_gini_hist <- gini_hist + 
+  theme_bw() + 
+  scale_x_continuous(name = "Gini Index of Income Inequality") + 
+  scale_y_continuous(name = "Number of CBSAs") + 
+  theme(axis.text.x = element_text(angle = 90))
+
+pretty_pown_hist <- pown_hist +
+  theme_bw() +
+  scale_x_continuous(name = "Homeownership Rate\n(percent)") +
+  scale_y_continuous(name = "Number of CBSAs") +
+  theme(axis.text.x = element_text(angle = 90))
+
+pretty_prentburd_hist <- prentburd_hist +
+  theme_bw() + 
+  scale_x_continuous(name = "Rent Burdened Population\n(percent, 30% of income or\nmore on rent)") +
+  scale_y_continuous(name = "Number of CBSAs") +
+  theme(axis.text.x = element_text(angle = 90))
+
+pretty_houseval_hist = houseval_hist +
+  theme_bw() +
+  scale_x_continuous(name = "Median Home Value\n(dollars)") +
+  scale_y_continuous(name = "Number of CBSAs") +
+  theme(axis.text.x = element_text(angle = 90)) 
+
+grid.arrange(pretty_gini_hist, pretty_pown_hist, pretty_prentburd_hist, pretty_houseval_hist,
+             ncol = 2)
+```
+
+### Gini Index Histogram 
+The Gini Index histogram demonstrates the high number of core-based statistical area that have a Gini index estimate between 0.4 and 0.5.
+
+### Homeownership Rate Histogram
+This histogram shows the range of homeownership rates that fall between 0.6 and 0.7 percent. The histogram also shows the greater distribution of this rate range across smaller groupings of CBSAs.   
+
+### Rent Burdened Population Histogram
+In this histogram, the distribution of CBSAs with rent-burdened households seems to fall evenly below and above 0.4 percent. 
+
+### Median Home Value Histogram 
+This final histogram shows a heavy distribution of CBSAs on the lower end of median home values.
+
+
+## Categorical Variables
+Our categorical variable is the core-based statistical area type.
+
+### Calculations
+First, we're applying a sample t-test to get the 95-percent confidence interval for the proportion of the sample in each category. 
+```{r}
+pct_micro <- t.test(data$type == "Micropolitan")
+pct_metro <-  t.test(data$type == "Metropolitan")
+```
+
+### Results 
+Now we can display our calculation results using both a table and a bar chart. 
+```{r}
+### Table 
+cat_summary_CBSA <- tibble(`CBSA Type` = 
+                              c("Micropolitan",
+                                "Metropolitan"),
+                            `Sample proportion` = 
+                              c(pct_micro$estimate * 100,
+                                pct_metro$estimate *100),
+                            `95-percent confidence - low` = 
+                              c(pct_micro$conf.int[1] * 100,
+                                pct_metro$conf.int[1] * 100),
+                            `95-percent confidence - high` = 
+                              c(pct_micro$conf.int[2] * 100,
+                                pct_metro$conf.int[2] * 100))
+
+kable(cat_summary_CBSA, digits = 0)
+```
+
+```{r}
+### Bar Chart 
+ggplot(cat_summary_CBSA) +
+  geom_bar(aes(x = `CBSA Type`, 
+               y = `Sample proportion`),
+           stat = "identity") +
+  geom_errorbar(aes(x = `CBSA Type`, 
+               y = `Sample proportion`,
+               ymin = `95-percent confidence - low`,
+               ymax = `95-percent confidence - high`),
+           stat = "identity") +
+  scale_y_continuous(name = "Percent of total CBSAs",
+                     breaks = c(0, 20, 40, 60, 80),
+                     labels = c("0", "20%", "40%", "60%", "80%")) +
+  theme_bw()
+
+```
+
+# Bivariate Regression
+Our dependent variable is median house value. Our independent variables are the Gini Inequality Coefficient, homeownership rates and rates of rent burden. 
+
+###Homeownership Rates
+```{r}
+cor.test(~ med_housevalE + pct_own, data = data)
+```
+Given the confidence interval ranges from a negative to a positive value, we cannot state with 95-percent confidence that there is a correlation between median house values and rates of homeownership. With a p-value greater than 0.05 (p-value = 0.06187), there is no statistical significance. 
+
+### Rent Burden
+```{r}
+cor.test(~ med_housevalE + pct_rentburd, data = data)
+```
+With a correlation estimate of 0.36 and a positive confidence interval, we can say with 95-percent confidence that there is a weak positive relationship between median house value and the percent of population experiencing rent burden. In other words, as the percent of the population experiencing rent burden increases within a core-based statistical area, there is a slight increase in the CBSA's median house values. 
+
+### Gini Inequality Coefficient 
+```{r}
+cor.test(~ med_housevalE + GiniE, data = data)
+```
+Given the confidence interval ranges from a negative to a positive value, we cannot state with 95-percent confidence that there is a correlation between median house values and rates of income inequality (Gini Index). With a p-value greater than 0.05 (p-value = 0.4701), the analysis also has no statistical significance. 
+
+# Categorical Variable Regression
+
+### Core-Based Statistical Areas
+```{r}
+t.test(med_housevalE ~ type, data)
+```
+With a positive confidence interval, we can say with 95-percent confidence that there is a correlation between median house value and the type of core-based statistical area. Given that the p-value is less than 0.05, these results are statistically significant. 
+
+# Multivariate Regression
+```{r}
+full_model <- lm(med_housevalE ~ pct_own + pct_rentburd + GiniE + type, data)
+
+summary(full_model)
+```
+In our multivariate regression, we have a multiple R-squared value of 0.1924. This indicates that about 20% of the variation in economic prosperity, as measured by median house value, can be explained by income diversity, as measured by homeownership rates, percent of population that is rent burdened and the Gini coefficient.
+
+This regression indicates that the only variable that is statistically significant (at a 90% confidence interval) in its correlation to economic prosperity is percent of population experiencing rent burdened. Given these results, we can say with 90% confidence that increasing the percent of the population experiencing rent burden in a core based statistical area by 1 would increase the area's median house value by $247,561. This is an interesting finding as we would expect a higher rent burdened population to decrease our proxy for a CBSA's economic prosperity, rather than increase it.
+
+# Transformations
+
+## Mean Centering
+```{r}
+centered_data <- data %>%
+  mutate(pct_own = pct_own - mean(pct_own, na.rm=TRUE),
+         pct_rentburd = pct_rentburd - mean(pct_rentburd, na.rm=TRUE))
+
+
+centered_model <- lm(med_housevalE ~ pct_own + pct_rentburd + GiniE + type, centered_data)
+
+coeff_names <- c("Intercept" = "(Intercept)",
+                 "Rate of Homeownership" = "pct_own",
+                 "Rate of Rent Burden" = "pct_rentburd",
+                 "Gini Coefficient" = "GiniE",
+                 "Micropolitan Area" = "typeMicropolitan")
+
+export_summs(full_model, centered_model, 
+             error_format = "(p = {p.value})",
+             error_pos = "same",
+             model.names = c("Initial", "Centered"),
+             coefs = coeff_names)
+
+```
+
+As one would expect, our model fit and the coefficients for our independent variables remain the same. However, the centering of the model around average rates of homeownership and rent burden did result in a higher median home value for houses in metropolitan areas. The centered model predicts a median home value of $238,922 for a metropolitan area as compared to the initial model, which predicts a median home value of $133,435 for a metropolitan area.  
+
+Our mean-centered intercept is also statistically significant at a 95% confidence interval. This increases the confidence in our model's ability to predict changes in median house values.   
+
+
+## Scaling
+```{r}
+centered_data_scaled <- centered_data %>%
+  mutate(pct_own_100 = pct_own * 100,
+         pct_rentburd_100 = pct_rentburd * 100)
+
+coeff_names_scaled <- c("Intercept" = "(Intercept)",
+                         "Rate of Homeownership" = "pct_own",
+                        "Rate of Rent Burden" = "pct_rentburd",
+                        "Homeownership (%)" = "pct_own_100",
+                        "Rent Burden (%)" = "pct_rentburd_100", 
+                        "Gini Coefficient" = "GiniE",
+                        "Micropolitan Area" = "typeMicropolitan")
+            
+                   
+centered_model_scaled <- lm(med_housevalE ~ pct_own_100 + pct_rentburd_100 + GiniE + type, centered_data_scaled)
+
+export_summs(full_model, centered_model, centered_model_scaled,
+             error_format = "(p = {p.value})",
+             error_pos = "same",
+             model.names = c("Initial\n(crates per CBSA)", 
+                             "Centered\n(rates per CBSA)", 
+                             "Centered\n(percentages per CBSA)"),
+             coefs = coeff_names_scaled)
+
+
+```
+
+The coefficients in the model are scaled by a factor of 100 for two independent variables--rates of homeownership and rates of rent burden. The model fit remains the same for all three models as presented in the table above. While we initially thought that this would convert our rates into percentages, we learned that the model already accounts for the rates as such. Therefore, scaling by a factor of 100 actually distorts the change in median home values per unit change in rates of homeownership and rent burden. For example, the initial model reflects a $9,732 change in median home values for a one unit increase in rates of homeownership while the scaled model reflects a $97.32 change in median home values for the same unit change. 
+
+We decided to complete two transformations in addition to our initial model in order to have several models for comparison. Our preferred model is the centered model as it provides the most realistic basis from which to interpret the relationships between our independent variables and dependent variable. Our scaled model is ultimately not useful because the dependent variable is measured in dollars, a unit that can become easily distorted by scaled independent variables. 
+
+# Interactions 
+
+Based on the results of our mean-centered model, we see that higher rates of income inequality are associated with lower median house values. Meanwhile, in controlling for income inequality, we observe that metropolitan counties have lower median house values than metropolitan ones. Does the relationship between rates of income inequality and median house values change depending on the type of core-based statistical area? We explore that question by interacting CBSA type with income inequality in the following model. 
+
+```{r}
+coeff_names_interaction <- c("Intercept" = "(Intercept)",
+                         "Rate of Homeownership" = "pct_own",
+                        "Rate of Rent Burden" = "pct_rentburd",
+                        "Gini Coefficient" = "GiniE",
+                        "Micropolitan Area" = "typeMicropolitan")
+                   
+                   
+interaction_model <- lm(med_housevalE ~ pct_own + pct_rentburd + GiniE + type + GiniE*type, data)
+
+export_summs(centered_model, interaction_model,
+             error_format = "(p = {p.value})",
+             error_pos = "same")
+
+```
+
+Our model fit remains the same. Meanwhile, the interaction between income inequality and CBSA type is positive and not statistically significant. Our coefficient for income inequality remains negative and insignificant. The difference in signs indicates that being in a micropolitan CBSA mitigates the effect of income inequality on median house values. 
+
+The following graph reinforces this conclusion, showing that the interaction of the metropolitan CBSA type and income inequality on median house values is stronger than the interaction of the micropolitan CBSA type and income inequality on median house values. 
+
+```{r}
+interact_plot(interaction_model, pred = GiniE, modx = type,
+              interval = TRUE) +
+  scale_x_continuous(breaks = breaks <- c(-2, -1, 0, 1, 2),
+                     labels = round(breaks * 10 + mean(data$GiniE, na.rm = TRUE)),
+                     name = "Income Inequality") +
+  scale_y_continuous(name = "Median House Values")
+```
+
+
+# References
+
+American Community Survey, 5-Year Estimate. 2019.
+
+"Confronting Concentrated Poverty with a Mixed-Income Strategy." Evidence Matters (Spring 2013). Office of Policy Development and Research at the United States Department of Housing and Urban Development. https://www.huduser.gov/portal/periodicals/em/spring13/highlight1.html#title.
+
+Freedman Ellis, Greg, and Derek Burk (2020). ipumsr: Read 'IPUMS' Extract Files.R package version 0.4.5. https://CRAN.R-project.org/package=ipumsr
+
+Levy, Diane K., Zach McDade, and Kassie Dumlao. "Effects from Living in Mixed-Income Communities for Low-Income Families: A Review of the Literature." The Urban Institute (2010), 14. https://www.urban.org/sites/default/files/publication/27116/412292-Effects-from-Living-in-Mixed-Income-Communities-for-Low-Income-Families.PDF. 
+
+Pebesma, E., 2018. Simple Features for R: Standardized Support for Spatial
+Vector Data. The R Journal 10 (1), 439-446, https://doi.org/10.32614/RJ-2018-009. 
+
+United States Census Bureau. 2010. 
+
+Walker, Kyle, and Matt Herman (2021). tidycensus: Load US Census Boundary and Attribute Data as ‘tidyverse’ and ‘sf’-Ready Data Frames. R package version 1.1. https://CRAN.R-project.org/package=tidycensus 
